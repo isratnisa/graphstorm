@@ -17,8 +17,10 @@
 """
 
 import os
+import time
 import torch as th
 import graphstorm as gs
+
 from graphstorm.config import get_argument_parser
 from graphstorm.config import GSConfig
 from graphstorm.trainer import GSgnnLinkPredictionTrainer
@@ -41,7 +43,7 @@ from graphstorm.model import do_full_graph_inference
 
 def main(args):
     config = GSConfig(args)
-
+    t_init = time.time()
     gs.initialize(ip_config=config.ip_config, backend=config.backend)
     train_data = GSgnnEdgeTrainData(config.graph_name,
                                     config.part_config,
@@ -51,6 +53,7 @@ def main(args):
     model = gs.create_builtin_lp_gnn_model(train_data.g, config, train_task=True)
     trainer = GSgnnLinkPredictionTrainer(model, gs.get_rank(),
                                          topk_model_to_save=config.topk_model_to_save)
+    print("gs.init & model, trainer setup", time.time() - t_init)
     if config.restore_model_path is not None:
         trainer.restore_model(model_path=config.restore_model_path)
     trainer.setup_cuda(dev_id=config.local_rank)
@@ -117,6 +120,9 @@ def main(args):
         save_model_path = os.path.join(config.save_embed_path, "model")
     else:
         save_model_path = None
+
+    print("Start training")
+    t_fit = time.time()
     trainer.fit(train_loader=dataloader, val_loader=val_dataloader,
                 test_loader=test_dataloader, num_epochs=config.num_epochs,
                 save_model_path=save_model_path,
@@ -124,7 +130,10 @@ def main(args):
                 save_model_frequency=config.save_model_frequency,
                 save_perf_results_path=config.save_perf_results_path,
                 freeze_input_layer_epochs=config.freeze_lm_encoder_epochs)
+    th.distributed.barrier()
+    print("trainer.fit time():", time.time() - t_fit)
 
+    t_infer = time.time()
     if config.save_embed_path is not None:
         model = gs.create_builtin_lp_gnn_model(train_data.g, config, train_task=False)
         best_model_path = trainer.get_best_model_path()
@@ -139,6 +148,8 @@ def main(args):
                                              edge_mask="train_mask", task_tracker=tracker)
         save_embeddings(config.save_embed_path, embeddings, gs.get_rank(),
                         th.distributed.get_world_size())
+        th.distributed.barrier()
+        print("infer and save emb time():", time.time() - t_infer)
 
 def generate_parser():
     parser = get_argument_parser()

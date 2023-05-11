@@ -18,6 +18,7 @@
 import time
 import torch as th
 from torch.nn.parallel import DistributedDataParallel
+import numpy as np
 
 from ..model.lp_gnn import GSgnnLinkPredictionModelInterface
 from ..model.lp_gnn import lp_mini_batch_predict
@@ -110,12 +111,16 @@ class GSgnnLinkPredictionTrainer(GSgnnTrainer):
         num_input_nodes = 0
         total_steps = 0
         early_stop = False # used when early stop is True
-        forward_time = 0
-        back_time = 0
+        forward_time = []
+        back_time = []
+        sampling_time = []
+        copy_emb_time = []
+        batch_time = []
         sys_tracker.check('start training')
         for epoch in range(num_epochs):
             model.train()
             t0 = time.time()
+            t_sampling = time.time()
 
             if freeze_input_layer_epochs <= epoch:
                 self._model.unfreeze_input_encoder()
@@ -131,28 +136,40 @@ class GSgnnLinkPredictionTrainer(GSgnnTrainer):
                 pos_graph = pos_graph.to(device)
                 neg_graph = neg_graph.to(device)
                 blocks = [blk.to(device) for blk in blocks]
+                th.distributed.barrier()
+                sampling_time.append(time.time() - t_sampling)
+
+
+                t_copy = time.time()
                 input_feats = data.get_node_feats(input_nodes, device)
                 for _, nodes in input_nodes.items():
                     num_input_nodes += nodes.shape[0]
+                th.distributed.barrier()
+                copy_emb_time.append(time.time() - t_copy)
 
-                t2 = time.time()
+                t2 = time.time() # forward time
                 # TODO(zhengda) we don't support edge features for now.
                 loss = model(blocks, pos_graph, neg_graph,
                              input_feats, None, input_nodes)
+                th.distributed.barrier()
 
-                t3 = time.time()
+                t3 = time.time() # backward time
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
-                forward_time += (t3 - t2)
-                back_time += (time.time() - t3)
+                th.distributed.barrier()
+
+                forward_time.append(t3 - t2)
+                back_time.append(time.time() - t3)
 
                 self.log_metric("Train loss", loss.item(), total_steps)
 
-                if i % 20 == 0 and self.rank == 0:
-                    print("Epoch {:05d} | Batch {:03d} | Train Loss: {:.4f} | Time: {:.4f}".
-                            format(epoch, i, loss.item(), time.time() - batch_tic))
-                    num_input_nodes = forward_time = back_time = 0
+                # if i % 2 == 0: # and self.rank == 0:
+                print("Epoch {:05d} | Batch {:03d} | Train Loss: {:.4f} | batchTime: {:.4f} | sampling: {:.4f} | copy embd: {:.4f} | forward: {:.4f} | backward: {:.4f}". \
+                        format(epoch, i, loss.item(), time.time() - batch_tic,
+                        np.average(sampling_time[-20:]), np.average(copy_emb_time[-20:]),
+                        np.average(forward_time[-20:]), np.average(back_time[-20:])))
+                    # num_input_nodes = forward_time = back_time = 0
 
                 val_score = None
                 if self.evaluator is not None and \
@@ -181,7 +198,7 @@ class GSgnnLinkPredictionTrainer(GSgnnTrainer):
                 # early_stop, exit current interation.
                 if early_stop is True:
                     break
-
+                t_sampling = time.time()
             # ------- end of an epoch -------
 
             th.distributed.barrier()

@@ -5,14 +5,14 @@ gsf:
     model_encoder_type: rgcn
     graph_name: ogbn-mag
     backend: gloo
-    ip_config: ip_list.txt
-    part_config: null
+    ip_config: /data/ip_list_p1_metal.txt
+    part_config: /data/ogbn-mag-lp-1p/ogbn-mag.json
     verbose: false
     eval_frequency: 1000
   gnn:
     fanout: "20,15"
     num_layers: 2
-    hidden_size: 256
+    hidden_size: 128
     use_mini_batch_infer: false
   input:
     restore_model_path: null
@@ -23,8 +23,8 @@ gsf:
   hyperparam:
     dropout: 0.
     lr: 0.0005
-    num_epochs: 20
-    batch_size: 4000
+    num_epochs: 2
+    batch_size: 4096
     wd_l2norm: 0
   rgcn:
     num_bases: -1
@@ -34,7 +34,7 @@ gsf:
     use_node_embeddings: false
   link_prediction:
     num_negative_edges: 4
-    num_negative_edges_eval: 100
+    num_negative_edges_eval: 16
     train_negative_sampler: joint
     eval_etype:
       - "author,writes,paper"
