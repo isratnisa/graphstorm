@@ -129,7 +129,6 @@ class GSgnnLinkPredictionTrainer(GSgnnTrainer):
             for i, (input_nodes, pos_graph, neg_graph, blocks) in enumerate(train_loader):
                 total_steps += 1
                 batch_tic = time.time()
-
                 if not isinstance(input_nodes, dict):
                     assert len(pos_graph.ntypes) == 1
                     input_nodes = {pos_graph.ntypes[0]: input_nodes}
@@ -164,36 +163,36 @@ class GSgnnLinkPredictionTrainer(GSgnnTrainer):
 
                 self.log_metric("Train loss", loss.item(), total_steps)
 
-                # if i % 2 == 0: # and self.rank == 0:
-                print("Epoch {:05d} | Batch {:03d} | Train Loss: {:.4f} | batchTime: {:.4f} | sampling: {:.4f} | copy embd: {:.4f} | forward: {:.4f} | backward: {:.4f}". \
-                        format(epoch, i, loss.item(), time.time() - batch_tic,
-                        np.average(sampling_time[-20:]), np.average(copy_emb_time[-20:]),
-                        np.average(forward_time[-20:]), np.average(back_time[-20:])))
+                if i % 20 == 0: # and self.rank == 0:
+                    print("Epoch {:05d} | Batch {:03d} | Train Loss: {:.4f} | batchTime: {:.4f} | sampling: {:.4f} | copy embd: {:.4f} | forward: {:.4f} | backward: {:.4f}". \
+                            format(epoch, i, loss.item(), time.time() - batch_tic,
+                            np.average(sampling_time[-20:]), np.average(copy_emb_time[-20:]),
+                            np.average(forward_time[-20:]), np.average(back_time[-20:])))
                     # num_input_nodes = forward_time = back_time = 0
 
-                val_score = None
-                if self.evaluator is not None and \
-                    self.evaluator.do_eval(total_steps, epoch_end=False):
-                    val_score = self.eval(model.module, data,
-                                          val_loader, test_loader, total_steps,
-                                          edge_mask_for_gnn_embeddings)
+                # val_score = None
+                # if self.evaluator is not None and \
+                #     self.evaluator.do_eval(total_steps, epoch_end=False):
+                #     val_score = self.eval(model.module, data,
+                #                           val_loader, test_loader, total_steps,
+                #                           edge_mask_for_gnn_embeddings)
 
-                    if self.evaluator.do_early_stop(val_score):
-                        early_stop = True
+                #     if self.evaluator.do_early_stop(val_score):
+                #         early_stop = True
 
                 # Every n iterations, check to save the top k models. If has validation score,
                 # will save the best top k. But if no validation, will either save
                 # the last k model or all models depends on the setting of top k
-                if save_model_frequency > 0 and \
-                    total_steps % save_model_frequency == 0 and \
-                    total_steps != 0:
-                    if self.evaluator is None or val_score is not None:
-                        # We will save the best model when
-                        # 1. There is no evaluation, we will keep the
-                        #    latest K models.
-                        # 2. There is evaluaiton, we need to follow the
-                        #    guidance of validation score.
-                        self.save_topk_models(model, epoch, i, val_score, save_model_path)
+                # if save_model_frequency > 0 and \
+                #     total_steps % save_model_frequency == 0 and \
+                #     total_steps != 0:
+                #     if self.evaluator is None or val_score is not None:
+                #         # We will save the best model when
+                #         # 1. There is no evaluation, we will keep the
+                #         #    latest K models.
+                #         # 2. There is evaluaiton, we need to follow the
+                #         #    guidance of validation score.
+                #         self.save_topk_models(model, epoch, i, val_score, save_model_path)
 
                 # early_stop, exit current interation.
                 if early_stop is True:
@@ -207,20 +206,20 @@ class GSgnnLinkPredictionTrainer(GSgnnTrainer):
                 print("Epoch {} take {}".format(epoch, epoch_time))
             dur.append(epoch_time)
 
-            val_score = None
-            if self.evaluator is not None and self.evaluator.do_eval(total_steps, epoch_end=True):
-                val_score = self.eval(model.module, data,
-                                      val_loader, test_loader, total_steps,
-                                      edge_mask_for_gnn_embeddings)
+            # val_score = None
+            # if self.evaluator is not None and self.evaluator.do_eval(total_steps, epoch_end=True):
+            #     val_score = self.eval(model.module, data,
+            #                           val_loader, test_loader, total_steps,
+            #                           edge_mask_for_gnn_embeddings)
 
-                if self.evaluator.do_early_stop(val_score):
-                    early_stop = True
+            #     if self.evaluator.do_early_stop(val_score):
+            #         early_stop = True
 
             # After each epoch, check to save the top k models. If has validation score, will save
             # the best top k. But if no validation, will either save the last k model or all models
             # depends on the setting of top k. To show this is after epoch save, set the iteration
             # to be None, so that we can have a determistic model folder name for testing and debug.
-            self.save_topk_models(model, epoch, None, val_score, save_model_path)
+            # self.save_topk_models(model, epoch, None, val_score, save_model_path)
 
             th.distributed.barrier()
 
@@ -229,16 +228,16 @@ class GSgnnLinkPredictionTrainer(GSgnnTrainer):
                 break
 
         print("Peak Mem alloc: {:.4f} MB".format(th.cuda.max_memory_allocated(device) / 1024 /1024))
-        if self.rank == 0 and self.evaluator is not None:
-            output = {'best_test_mrr': self.evaluator.best_test_score,
-                       'best_val_mrr':self.evaluator.best_val_score,
-                       'peak_mem_alloc_MB': th.cuda.max_memory_allocated(device) / 1024 / 1024,
-                       'best_epoch': best_epoch}
-            self.log_params(output)
+        # if self.rank == 0 and self.evaluator is not None:
+        #     output = {'best_test_mrr': self.evaluator.best_test_score,
+        #                'best_val_mrr':self.evaluator.best_val_score,
+        #                'peak_mem_alloc_MB': th.cuda.max_memory_allocated(device) / 1024 / 1024,
+        #                'best_epoch': best_epoch}
+        #     self.log_params(output)
 
-            if save_perf_results_path is not None:
-                self.save_model_results_to_file(self.evaluator.best_test_score,
-                                                save_perf_results_path)
+        #     if save_perf_results_path is not None:
+        #         self.save_model_results_to_file(self.evaluator.best_test_score,
+        #                                         save_perf_results_path)
 
     def eval(self, model, data, val_loader, test_loader,
         total_steps, edge_mask_for_gnn_embeddings):
