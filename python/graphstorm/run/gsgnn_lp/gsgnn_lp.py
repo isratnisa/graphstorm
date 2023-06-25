@@ -47,7 +47,7 @@ def main(config_args):
     """
     config = GSConfig(config_args)
 
-    gs.initialize(ip_config=config.ip_config, backend=config.backend)
+    gs.initialize(ip_config=config.ip_config, backend=config.backend, device=config.local_rank)
     rt_profiler.init(config.profile_path, rank=gs.get_rank())
     sys_tracker.init(config.verbose, rank=gs.get_rank())
     node_feat_field = config.node_feat_name

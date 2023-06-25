@@ -142,7 +142,7 @@ class GSgnnLinkPredictionTrainer(GSgnnTrainer):
                 self.optimizer.zero_grad()
                 loss.backward()
                 rt_profiler.record('train_backward')
-                self.optimizer.step()
+                # self.optimizer.step()
                 rt_profiler.record('train_step')
 
                 self.log_metric("Train loss", loss.item(), total_steps)

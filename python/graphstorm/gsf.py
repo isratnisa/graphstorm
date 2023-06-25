@@ -49,7 +49,7 @@ from .model.edge_decoder import (LinkPredictDotDecoder,
                                  LinkPredictWeightedDistMultDecoder)
 from .tracker import get_task_tracker_class
 
-def initialize(ip_config, backend):
+def initialize(ip_config, backend, device):
     """ Initialize distributed inference context
 
     Parameters
@@ -58,9 +58,12 @@ def initialize(ip_config, backend):
         File path of ip_config file
     backend: str
         Torch distributed backend
+    device: int
+        Local rank of the device
     """
     # We need to use socket for communication in DGL 0.8. The tensorpipe backend has a bug.
     # This problem will be fixed in the future.
+    th.cuda.set_device(device)
     dgl.distributed.initialize(ip_config, net_type='socket')
     th.distributed.init_process_group(backend=backend)
     sys_tracker.check("load DistDGL")
