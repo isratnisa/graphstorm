@@ -64,8 +64,17 @@ def prepare_batch_input(g, input_nodes,
 
         if feat_name is not None:
             # concatenate multiple features together
-            feat[ntype] = th.cat([g.nodes[ntype].data[fname][nid].to(dev) \
-                for fname in feat_name], dim=1)
+            # feat[ntype] = th.cat([g.nodes[ntype].data[fname][nid].to(dev) \
+            #     for fname in feat_name], dim=1)
+            feats = []
+            for fname in feat_name:
+                data = g.nodes[ntype].data[fname]
+                if hasattr(data, 'gather'):
+                    data = data.gather(nid.to(dev))
+                else:
+                    data = data[nid].to(dev)
+                feats.append(data)
+            feat[ntype] = th.cat(feats, dim=1)
     return feat
 
 def prepare_batch_edge_input(g, input_edges,
