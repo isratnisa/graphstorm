@@ -158,13 +158,13 @@ class GSgnnLinkPredictionTrainer(GSgnnTrainer):
                             format(epoch, i, loss.item(), time.time() - batch_tic))
 
                 val_score = None
-                if self.evaluator is not None and \
-                    self.evaluator.do_eval(total_steps, epoch_end=False):
-                    val_score = self.eval(model.module if is_distributed() else model,
-                                          data, val_loader, test_loader, total_steps,
-                                          edge_mask_for_gnn_embeddings)
-                    if self.evaluator.do_early_stop(val_score):
-                        early_stop = True
+                # if self.evaluator is not None and \
+                    # self.evaluator.do_eval(total_steps, epoch_end=False):
+                val_score = self.eval(model.module if is_distributed() else model,
+                                      data, val_loader, test_loader, use_mini_batch_infer,
+                                      total_steps, edge_mask_for_gnn_embeddings)
+                    # if self.evaluator.do_early_stop(val_score):
+                    #     early_stop = True
 
                 # Every n iterations, check to save the top k models. If has validation score,
                 # will save the best top k. But if no validation, will either save
@@ -196,8 +196,8 @@ class GSgnnLinkPredictionTrainer(GSgnnTrainer):
             val_score = None
             if self.evaluator is not None and self.evaluator.do_eval(total_steps, epoch_end=True):
                 val_score = self.eval(model.module if is_distributed() else model,
-                                      data, val_loader, test_loader, total_steps,
-                                      edge_mask_for_gnn_embeddings)
+                                      data, val_loader, test_loader, use_mini_batch_infer,
+                                      total_steps, edge_mask_for_gnn_embeddings)
 
                 if self.evaluator.do_early_stop(val_score):
                     early_stop = True
@@ -237,7 +237,7 @@ class GSgnnLinkPredictionTrainer(GSgnnTrainer):
                 self.save_model_results_to_file(self.evaluator.best_test_score,
                                                 save_perf_results_path)
 
-    def eval(self, model, data, val_loader, test_loader, total_steps,
+    def eval(self, model, data, val_loader, test_loader, use_mini_batch_infer, total_steps,
              edge_mask_for_gnn_embeddings):
         """ do the model evaluation using validiation and test sets
 
@@ -251,6 +251,8 @@ class GSgnnLinkPredictionTrainer(GSgnnTrainer):
             The dataloader for validation data
         test_loader : GSNodeDataLoader
             The dataloader for test data.
+        use_mini_batch_infer: bool
+            Whether to use inference on mini-batches or full-graph
         total_steps: int
             Total number of iterations.
         edge_mask_for_gnn_embeddings : str
@@ -263,7 +265,9 @@ class GSgnnLinkPredictionTrainer(GSgnnTrainer):
         test_start = time.time()
         sys_tracker.check('before prediction')
         model.eval()
-
+        # if use_mini_batch_infer:
+        #     print("TODO")
+        # else:
         emb = do_full_graph_inference(model, data, fanout=val_loader.fanout,
                                       edge_mask=edge_mask_for_gnn_embeddings,
                                       task_tracker=self.task_tracker)
